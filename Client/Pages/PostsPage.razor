@@ -1,0 +1,108 @@
+﻿@page "/posts"
+@using Client.Services
+@using CryptoShoto.DTO;
+@using DAL.Models
+@inject PostService postService;
+@inject NavigationManager NavigationManager;
+@inject AuthenticationStateProvider AuthenticationStateProvider;
+
+<PageTitle>Posts</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="form-group">
+            <label for="Text">Text:</label>
+            <input type="text" id="Text" class="form-control" @bind="@post.Text" />
+        </div>
+
+        <div class="form-group">
+            <label for="Photo">Photo:</label>
+            <input type="text" id="Photo" class="form-control" @bind="@post.Photo" />
+        </div>
+
+        <button class="btn btn-primary" @onclick="@CreatePost">Create</button>
+
+        <br>
+        <br>
+        <br>
+        <br>
+
+        <h2>Your posts:</h2>
+
+        <ul>
+            @if (posts == null)
+            {
+                <p>Loading...</p>
+            }
+            else
+            {
+                @if (posts != null && posts.Any())
+                {
+                    @foreach (var item in posts)
+                    {
+                        <li>@item.Text <img src=@item.Photo width="200" height="200" /></li>
+                        <br />
+                        <button class="btn btn-primary" @onclick="() => DeletePost(item.Id)">Delete</button>
+                    }
+
+                    <div class="NuberOfPage">
+                        <br />
+                        @foreach (var item in listofpages)
+                        {
+                            <button class="btn btn-primary" @onclick="() => OpenPage(item)">@item</button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <li>No posts found.</li>
+                }
+            }
+        </ul>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private PostDTO post = new PostDTO();
+    private IEnumerable<Post> posts;
+    List<int> listofpages = new List<int>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!authState.User.Identity.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/login");
+        }
+        else
+        {
+            int countofpages = await postService.GetCountOfPosts(int.Parse(authState.User.FindFirst("UID").Value));
+            for (int i = 1; i <= countofpages; i++)
+            {
+                listofpages.Add(i);
+            }
+            await OpenPage();
+        }
+        
+    }
+
+    private async Task CreatePost()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        post.UserId = int.Parse(authState.User.FindFirst("UID").Value);
+        await postService.AddPost(post);
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    public async Task DeletePost(int newsId)
+    {
+        await postService.DeletePost(newsId);
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    public async Task OpenPage(int page = 1)
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        posts = await postService.GetPosts(page, int.Parse(authState.User.FindFirst("UID").Value));
+    }
+}

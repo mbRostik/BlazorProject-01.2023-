@@ -1,0 +1,58 @@
+﻿@page "/login"
+@using CryptoShoto.DTO;
+@using Client.Services;
+@inject IdentityService identityService;
+@inject IJSRuntime JSRunTime;
+@inject NavigationManager NavigationManager;
+@inject AuthenticationStateProvider AuthenticationStateProvider;
+
+<PageTitle>Login</PageTitle>
+
+<EditForm Model="@loginModel" OnValidSubmit="@HandleSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <label for="Email">Email:</label>
+    <InputText @bind-Value="loginModel.Email" class="form-control" />
+
+    <label for="Password">Password:</label>
+    <InputText @bind-Value="loginModel.Password" class="form-control" /><br />
+
+    <button type="submit" class="btn btn-primary">Submit</button>   
+</EditForm> 
+
+@if (check == true)
+{
+    <p>Email or password entered incorrectly</p>
+}
+
+@code
+{
+    private LoginDTO loginModel = new();
+    private bool check = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity.IsAuthenticated)
+        {
+            var authModule = await JSRunTime.InvokeAsync<IJSObjectReference>("import", "./js/auth.js");
+            await authModule.InvokeVoidAsync("SendMessage", "You are already authorizated!");
+
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (await identityService.LoginSend(loginModel) == "OK")
+        {
+            var user = await identityService.GetUserByEmail(loginModel.Email);
+            var authModule = await JSRunTime.InvokeAsync<IJSObjectReference>("import", "./js/auth.js");
+            await authModule.InvokeVoidAsync("SignIn", loginModel.Email, user.UserName, user.Id, "/");
+        }
+
+        else
+            check = true;
+    }
+}

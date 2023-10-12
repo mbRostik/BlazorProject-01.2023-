@@ -1,0 +1,83 @@
+﻿@page "/register"
+@using CryptoShoto.DTO;
+@using Client.Services;
+@inject IJSRuntime JSRunTime;
+@inject NavigationManager NavigationManager;
+@inject IdentityService identityService;
+@inject AuthenticationStateProvider AuthenticationStateProvider;
+
+<PageTitle>Register</PageTitle>
+
+<EditForm Model="@registerModel" OnValidSubmit="@HandleSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <label for="Email">Email:</label>
+    <InputText @bind-Value="registerModel.Email" class="form-control" />
+
+    <label for="UserName">UserName:</label>
+    <InputText @bind-Value="registerModel.UserName" class="form-control" />
+
+    <label for="Password">Password:</label>
+    <InputText @bind-Value="registerModel.Password" class="form-control" />
+
+    <label for="ConfirmPassword">ConfirmPassword:</label>
+    <InputText @bind-Value="registerModel.ConfirmPassword" class="form-control" />
+
+    <button type="submit" class="btn btn-primary">Submit</button>
+
+</EditForm> 
+
+@if (checkEmail == true)
+{
+    <p>This email is taken, try another one</p>
+}
+
+@if (checkUserName == true)
+{
+    <p>This username is taken, try another one</p>
+}
+
+<br>
+<p>If you are already registered</p>
+<button class="btn btn-primary" onclick="window.location.href='/login'">Sign in</button>
+
+@code
+{
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity.IsAuthenticated)
+        {
+            var authModule = await JSRunTime.InvokeAsync<IJSObjectReference>("import", "./js/auth.js");
+            await authModule.InvokeVoidAsync("SendMessage", "You are already authorizated!");
+
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    private RegistrationDTO registerModel = new();
+    bool checkEmail = false, checkUserName = false;
+
+    private async Task HandleSubmit()
+    {
+        string result = await identityService.RegisterSend(registerModel);
+
+        checkEmail = false; checkUserName = false;
+
+        if (result == "Email and username are taken")
+        {
+            checkEmail = true; checkUserName = true;
+        }
+        if (result == "Email is taken")
+            checkEmail = true;
+        if (result == "Username is taken")
+            checkUserName = true;
+        if (result == "OK")
+        {
+            var user = await identityService.GetUserByEmail(registerModel.Email);
+            var authModule = await JSRunTime.InvokeAsync<IJSObjectReference>("import", "./js/auth.js");
+            await authModule.InvokeVoidAsync("SignIn", registerModel.Email, registerModel.UserName, user.Id, "/");
+        }
+    }
+}
